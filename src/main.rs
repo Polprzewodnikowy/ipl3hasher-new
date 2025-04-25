@@ -28,6 +28,15 @@ fn run_hasher() -> Result<(), HasherError> {
         target_checksum,
     )?;
 
+    let adapter_info = hasher.get_gpu_info();
+
+    println!(
+        "GPU: \"{}\", backend: \"{}\"",
+        adapter_info.name, adapter_info.backend
+    );
+
+    println!("Target seed and checksum: 0x{seed:02X} 0x{target_checksum:012X}");
+
     if let Some(y_init) = y_init {
         hasher.set_y(y_init);
     }

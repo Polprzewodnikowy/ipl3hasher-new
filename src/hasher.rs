@@ -141,4 +141,8 @@ impl Hasher {
 
         Ok(HasherResult::Continue)
     }
+
+    pub fn get_gpu_info(&self) -> wgpu::AdapterInfo {
+        self.gpu.get_gpu_info()
+    }
 }

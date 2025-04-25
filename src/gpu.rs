@@ -72,6 +72,7 @@ impl std::fmt::Display for GPUHasherError {
 }
 
 pub struct GPUHasher {
+    adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
     input_buffer: wgpu::Buffer,
@@ -179,6 +180,7 @@ impl GPUHasher {
         });
 
         Ok(Self {
+            adapter,
             device,
             queue,
             input_buffer,
@@ -256,5 +258,9 @@ impl GPUHasher {
             }
             Some((y, x)) => GPUHasherResult::Found(y, x),
         })
+    }
+
+    pub fn get_gpu_info(&self) -> wgpu::AdapterInfo {
+        self.adapter.get_info()
     }
 }
