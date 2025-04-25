@@ -17,6 +17,7 @@ fn run_hasher() -> Result<(), HasherError> {
         y_init,
         gpu_adapter,
         workgroups,
+        y_bits
     } = cli::parse();
     let (seed, target_checksum) = cic;
 
@@ -26,6 +27,7 @@ fn run_hasher() -> Result<(), HasherError> {
         workgroups,
         seed,
         target_checksum,
+        y_bits.clone(),
     )?;
 
     let adapter_info = hasher.get_gpu_info();
@@ -49,9 +51,9 @@ fn run_hasher() -> Result<(), HasherError> {
         match hasher.compute_round()? {
             HasherResult::Found(y, x) => {
                 print_execution_time(y_current, time);
-                println!("Found collision: {y:08X} {x:08X}");
+                println!("Found collision: Y={y:08X} X={x:08X}");
                 if sign {
-                    Hasher::sign_rom(rom.into(), y, x)?;
+                    Hasher::sign_rom(rom.into(), y_bits, y, x)?;
                     println!("ROM has been successfully signed");
                 }
                 return Ok(());
