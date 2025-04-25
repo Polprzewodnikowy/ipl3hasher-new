@@ -45,6 +45,7 @@ pub struct Hasher {
     gpu: gpu::GPUHasher,
     workgroup_configuration: (u32, u32, u32),
     target_checksum: u64,
+    y_bits: Vec<u32>,
     y: u32,
 }
 
@@ -55,10 +56,11 @@ impl Hasher {
         workgroup_configuration: (u32, u32, u32),
         seed: u8,
         target_checksum: u64,
+        y_bits: Vec<u32>
     ) -> Result<Self, HasherError> {
         let ipl3 = Self::load_ipl3(path)?;
 
-        let cpu = cpu::CPUHasher::new(&ipl3, seed);
+        let cpu = cpu::CPUHasher::new(&ipl3, seed, y_bits.clone());
 
         let adapters = gpu::GPUHasher::list_gpu_adapters();
         let adapter = adapters
@@ -66,11 +68,15 @@ impl Hasher {
             .ok_or(HasherError::GPUAdapterOutOfBounds)?;
         let gpu = gpu::GPUHasher::new(adapter.clone())?;
 
+        // print adapter info
+        println!("GPU: {:?}", adapter.get_info());
+
         Ok(Self {
             cpu,
             gpu,
             workgroup_configuration,
             target_checksum,
+            y_bits,
             y: 0,
         })
     }
@@ -83,11 +89,27 @@ impl Hasher {
         Ok(ipl3)
     }
 
-    pub fn sign_rom(path: std::path::PathBuf, y: u32, x: u32) -> Result<(), HasherError> {
-        let mut f = std::fs::OpenOptions::new().write(true).open(path)?;
-        f.seek(std::io::SeekFrom::Start(4088))?;
+    pub fn sign_rom(path: std::path::PathBuf, y_bits: Vec<u32>, y: u32, x: u32) -> Result<(), HasherError> {
+        let mut f = std::fs::OpenOptions::new().write(true).read(true).open(path)?;
+        for i in 0..y_bits.len() {
+            let byte_index = y_bits[i] / 8;
+            let bit_offset = y_bits[i] % 8;
+            f.seek(std::io::SeekFrom::Start(byte_index as u64))?;
+            
+            let mut byte = [0u8; 1];
+            f.read_exact(&mut byte)?;
+            let mask = 1 << bit_offset;
+            if (y >> i) & 1 == 1 {
+                byte[0] |= mask;
+            } else {
+                byte[0] &= !mask;
+            }
+            f.seek(std::io::SeekFrom::Start(byte_index as u64))?;
+            f.write_all(&byte)?;
+        }
+        
+        f.seek(std::io::SeekFrom::Start(4092))?;
         let mut data: Vec<u8> = vec![];
-        data.append(&mut y.to_be_bytes().to_vec());
         data.append(&mut x.to_be_bytes().to_vec());
         f.write_all(&data)?;
         f.flush()?;
@@ -103,6 +125,10 @@ impl Hasher {
     }
 
     pub fn compute_round(&mut self) -> Result<HasherResult, HasherError> {
+        if self.y as u64 > (1u64 << self.y_bits.len()) - 1 {
+            return Ok(HasherResult::End);
+        }
+
         let state = self.cpu.y_round(self.y);
 
         let mut x_offset = 0;
@@ -133,7 +159,7 @@ impl Hasher {
             }
         }
 
-        if self.y == u32::MAX {
+        if self.y as u64 == (1u64 << self.y_bits.len()) - 1 {
             return Ok(HasherResult::End);
         }
 

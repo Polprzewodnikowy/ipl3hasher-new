@@ -1,5 +1,6 @@
 pub struct CPUHasher {
     ipl3: [u32; 1008],
+    y_bits: Vec<u32>,
     state: [u32; 16],
 }
 
@@ -123,7 +124,7 @@ impl CPUHasher {
         (((final_sum & 0xFFFF) as u64) << 32) | (final_xor as u64)
     }
 
-    pub fn new(ipl3_raw_data: &[u8; 4032], seed: u8) -> Self {
+    pub fn new(ipl3_raw_data: &[u8; 4032], seed: u8, y_bits: Vec<u32>) -> Self {
         let mut ipl3 = [0u32; 1008];
 
         for (i, bytes) in ipl3_raw_data.chunks(4).enumerate() {
@@ -134,18 +135,22 @@ impl CPUHasher {
 
         state.fill(Self::add(Self::mul(Self::MAGIC, seed as u32), 1) ^ ipl3[0]);
 
-        Self::calculate(&ipl3, &mut state, 1, 1006, false);
-
-        Self { ipl3, state }
+        Self { ipl3, y_bits, state }
     }
 
     pub fn y_round(&self, y: u32) -> [u32; 16] {
         let mut ipl3 = self.ipl3.clone();
         let mut state = self.state.clone();
 
-        ipl3[1006] = y;
+        // Set the Y value in bit positions specified by y_bits
+        for i in 0..self.y_bits.len() {
+            let index = self.y_bits[i] / 32;
+            let bitoffset = self.y_bits[i] % 32;
+            let bit = (y >> i) & 0x01;
+            ipl3[index as usize] |= bit << bitoffset;
+        }
 
-        Self::calculate(&ipl3, &mut state, 1006, 1007, true);
+        Self::calculate(&ipl3, &mut state, 1, 1007, false);
 
         let prev = ipl3[1005];
         let data = ipl3[1006];
@@ -166,10 +171,16 @@ impl CPUHasher {
         let mut ipl3 = self.ipl3.clone();
         let mut state = self.state.clone();
 
-        ipl3[1006] = y;
+        for i in 0..self.y_bits.len() {
+            let index = self.y_bits[i] / 32;
+            let bitoffset = self.y_bits[i] % 32;
+            let bit = (y >> i) & 0x01;
+            ipl3[index as usize] |= bit << bitoffset;
+        }
+
         ipl3[1007] = x;
 
-        Self::calculate(&ipl3, &mut state, 1006, 1008, true);
+        Self::calculate(&ipl3, &mut state, 1, 1008, false);
         Self::finalize(&state)
     }
 }
