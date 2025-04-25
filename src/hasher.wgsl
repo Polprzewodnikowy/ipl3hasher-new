@@ -135,8 +135,7 @@ fn main(
     finalize_checksum(y, x);
     if finalize_hi() == input.target_hi {
         if finalize_lo() == input.target_lo {
-            if atomicLoad(&output.found) == 0 {
-                atomicStore(&output.found, 1);
+            if atomicOr(&output.found, 1) == 0 {
                 output.y_result = y;
                 output.x_result = x;
             }
