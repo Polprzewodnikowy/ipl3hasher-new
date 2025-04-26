@@ -130,17 +130,23 @@ impl CPUHasher {
         Self { ipl3, state }
     }
 
-    pub fn y_round(&self, y_bits: Vec<u32>, y: u32) -> [u32; 16] {
+    fn apply_y_bits(&self, y_bits: Vec<u32>, y: u32) -> [u32; 1008] {
         let mut ipl3 = self.ipl3.clone();
-        let mut state = self.state.clone();
 
-        // Set the Y value in bit positions specified by y_bits
-        for i in 0..y_bits.len() {
-            let index = y_bits[i] / 32;
-            let bitoffset = y_bits[i] % 32;
-            let bit = (y >> i) & 0x01;
-            ipl3[index as usize] |= bit << bitoffset;
+        for (i, offset) in y_bits.iter().enumerate() {
+            let index = (offset / 32) as usize;
+            let bit = offset % 32;
+            let value = (y >> i) & (1 << 0);
+            ipl3[index] &= !(1 << bit);
+            ipl3[index] |= value << bit;
         }
+
+        ipl3
+    }
+
+    pub fn y_round(&self, y_bits: Vec<u32>, y: u32) -> (u32, [u32; 16]) {
+        let ipl3 = self.apply_y_bits(y_bits, y);
+        let mut state = self.state.clone();
 
         Self::calculate(&ipl3, &mut state, 1007);
 
@@ -156,19 +162,12 @@ impl CPUHasher {
         state[14] = Self::sum(state[14], Self::ror(data, prev & 0x1F), 1007);
         state[15] = Self::sum(state[15], Self::rol(data, prev >> 27), 1007);
 
-        state
+        (data, state)
     }
 
     pub fn verify(&self, y_bits: Vec<u32>, y: u32, x: u32) -> u64 {
-        let mut ipl3 = self.ipl3.clone();
+        let mut ipl3 = self.apply_y_bits(y_bits, y);
         let mut state = self.state.clone();
-
-        for i in 0..y_bits.len() {
-            let index = y_bits[i] / 32;
-            let bitoffset = y_bits[i] % 32;
-            let bit = (y >> i) & 0x01;
-            ipl3[index as usize] |= bit << bitoffset;
-        }
 
         ipl3[1007] = x;
 

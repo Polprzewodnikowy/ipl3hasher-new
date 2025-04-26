@@ -107,16 +107,16 @@ impl Hasher {
             return Ok(HasherResult::End);
         }
 
-        let state = self.cpu.y_round(self.y_bits.clone(), self.y);
+        let (y_offset, state) = self.cpu.y_round(self.y_bits.clone(), self.y);
 
         let mut x_offset = 0;
 
         loop {
             let result = self.gpu.x_round(
                 self.target_checksum,
-                state,
-                self.y,
+                y_offset,
                 x_offset,
+                state,
                 self.workgroups,
             )?;
 

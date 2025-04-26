@@ -16,7 +16,7 @@ struct GPUHasherInput {
 }
 
 impl GPUHasherInput {
-    fn new(target_checksum: u64, state: [u32; 16], y_offset: u32, x_offset: u32) -> Self {
+    fn new(target_checksum: u64, y_offset: u32, x_offset: u32, state: [u32; 16]) -> Self {
         Self {
             target_hi: ((target_checksum >> 32) & 0xFFFF) as u32,
             target_lo: (target_checksum & 0xFFFFFFFF) as u32,
@@ -201,9 +201,9 @@ impl GPUHasher {
     pub fn x_round(
         &mut self,
         target_checksum: u64,
-        initial_state: [u32; 16],
         y_offset: u32,
         x_offset: u32,
+        initial_state: [u32; 16],
         (wx, wy, wz): (u32, u32, u32),
     ) -> Result<GPUHasherResult, HasherError> {
         let mut command_encoder = self
@@ -236,9 +236,9 @@ impl GPUHasher {
             0,
             bytemuck::bytes_of(&GPUHasherInput::new(
                 target_checksum,
-                initial_state,
                 y_offset,
                 x_offset,
+                initial_state,
             )),
         );
 
