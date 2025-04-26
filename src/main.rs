@@ -5,7 +5,7 @@ mod error;
 mod gpu;
 mod hasher;
 
-fn print_execution_time(y: u32, time: std::time::Instant) {
+fn print_round_execution_time(y: u32, time: std::time::Instant) {
     println!("Y={} took {:?}", y, time.elapsed());
 }
 
@@ -54,7 +54,7 @@ fn run_hasher() -> Result<(), error::HasherError> {
 
         match hasher.compute_round()? {
             hasher::HasherResult::Found(y, x) => {
-                print_execution_time(y_current, time);
+                print_round_execution_time(y_current, time);
                 println!("Found collision: Y={y:08X} X={x:08X}");
                 if sign {
                     hasher::Hasher::sign_rom(rom.into(), y_bits, y, x)?;
@@ -63,7 +63,7 @@ fn run_hasher() -> Result<(), error::HasherError> {
                 return Ok(());
             }
             hasher::HasherResult::Continue => {
-                print_execution_time(y_current, time);
+                print_round_execution_time(y_current, time);
             }
             hasher::HasherResult::End => {
                 break;

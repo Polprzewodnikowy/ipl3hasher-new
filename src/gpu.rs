@@ -94,6 +94,7 @@ impl GPUHasher {
                         "hasher.glsl",
                         include_str!("shaders/hasher.glsl"),
                         Self::ENTRY_POINT,
+                        // TODO: Figure out why wgpu can't validate the shader with an unpack instruction
                         None, // Some(vec![("USE_UNPACK_UINT_2X32", None)]),
                     )?
                     .into(),
