@@ -49,9 +49,12 @@ impl Hasher {
 
     fn load_ipl3(path: std::path::PathBuf) -> Result<[u8; 4032], HasherError> {
         let mut f = std::fs::File::open(path)?;
+
         let mut ipl3 = [0u8; 4032];
+
         f.seek(std::io::SeekFrom::Start(64))?;
         f.read_exact(&mut ipl3)?;
+
         Ok(ipl3)
     }
 
@@ -62,31 +65,33 @@ impl Hasher {
         x: u32,
     ) -> Result<(), HasherError> {
         let mut f = std::fs::OpenOptions::new()
-            .write(true)
             .read(true)
+            .write(true)
             .open(path)?;
-        for i in 0..y_bits.len() {
-            let byte_index = y_bits[i] / 8;
-            let bit_offset = y_bits[i] % 8;
-            f.seek(std::io::SeekFrom::Start(byte_index as u64))?;
 
-            let mut byte = [0u8; 1];
+        for (i, offset) in y_bits.iter().enumerate() {
+            let index = offset / 8;
+            let bit = 7 - (offset % 8);
+            let shift = y_bits.len() - 1;
+            let value = ((y >> (shift - i)) & (1 << 0)) as u8;
+
+            let mut byte = [0u8];
+
+            f.seek(std::io::SeekFrom::Start(index as u64 + 64))?;
             f.read_exact(&mut byte)?;
-            let mask = 1 << bit_offset;
-            if (y >> i) & 1 == 1 {
-                byte[0] |= mask;
-            } else {
-                byte[0] &= !mask;
-            }
-            f.seek(std::io::SeekFrom::Start(byte_index as u64))?;
-            f.write_all(&byte)?;
+
+            byte[0] &= !(1 << bit);
+            byte[0] |= value << bit;
+
+            f.seek(std::io::SeekFrom::Current(-1))?;
+            f.write_all(&mut byte)?;
         }
 
         f.seek(std::io::SeekFrom::Start(4092))?;
-        let mut data: Vec<u8> = vec![];
-        data.append(&mut x.to_be_bytes().to_vec());
-        f.write_all(&data)?;
+        f.write_all(&mut x.to_be_bytes().to_vec())?;
+
         f.flush()?;
+
         Ok(())
     }
 

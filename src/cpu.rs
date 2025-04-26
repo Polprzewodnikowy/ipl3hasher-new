@@ -135,8 +135,10 @@ impl CPUHasher {
 
         for (i, offset) in y_bits.iter().enumerate() {
             let index = (offset / 32) as usize;
-            let bit = offset % 32;
-            let value = (y >> i) & (1 << 0);
+            let bit = 31 - (offset % 32);
+            let shift = y_bits.len() - 1;
+            let value = (y >> (shift - i)) & (1 << 0);
+
             ipl3[index] &= !(1 << bit);
             ipl3[index] |= value << bit;
         }
