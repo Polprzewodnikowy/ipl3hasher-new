@@ -17,7 +17,6 @@ layout(std430, binding = 0) readonly buffer input_data {
 
 layout(std430, binding = 1) buffer output_data {
     int found;
-    uint y_result;
     uint x_result;
 };
 
@@ -139,7 +138,6 @@ void main() {
     if (finalize_hi(state) == target_hi) {
         if (finalize_lo(state) == target_lo) {
             if (atomicOr(found, 1) == 0) {
-                y_result = y;
                 x_result = x;
             }
         }

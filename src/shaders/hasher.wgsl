@@ -12,7 +12,6 @@ struct Input {
 
 struct Output {
     found: atomic<i32>,
-    y_result: u32,
     x_result: u32,
 }
 
@@ -136,7 +135,6 @@ fn main(
     if finalize_hi() == input.target_hi {
         if finalize_lo() == input.target_lo {
             if atomicOr(&output.found, 1) == 0 {
-                output.y_result = y;
                 output.x_result = x;
             }
         }

@@ -126,12 +126,12 @@ impl Hasher {
             )?;
 
             match result {
-                gpu::GPUHasherResult::Found(y, x) => {
-                    let verify_checksum = self.cpu.verify(self.y_bits.clone(), y, x);
+                gpu::GPUHasherResult::Found(x) => {
+                    let verify_checksum = self.cpu.verify(self.y_bits.clone(), self.y, x);
                     if verify_checksum != self.target_checksum {
-                        return Err(HasherError::ChecksumVerifyError(y, x, verify_checksum));
+                        return Err(HasherError::ChecksumVerifyError(self.y, x, verify_checksum));
                     }
-                    return Ok(HasherResult::Found(y, x));
+                    return Ok(HasherResult::Found(self.y, x));
                 }
                 gpu::GPUHasherResult::Continue(x_step) => {
                     x_offset += x_step;

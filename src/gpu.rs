@@ -31,14 +31,13 @@ impl GPUHasherInput {
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct GPUHasherOutput {
     found: i32,
-    y_result: u32,
     x_result: u32,
 }
 
 impl GPUHasherOutput {
-    fn get_result(&self) -> Option<(u32, u32)> {
+    fn get_result(&self) -> Option<u32> {
         if self.found != 0 {
-            Some((self.y_result, self.x_result))
+            Some(self.x_result)
         } else {
             None
         }
@@ -46,7 +45,7 @@ impl GPUHasherOutput {
 }
 
 pub enum GPUHasherResult {
-    Found(u32, u32),
+    Found(u32),
     Continue(u32),
     End,
 }
@@ -263,7 +262,7 @@ impl GPUHasher {
                     GPUHasherResult::Continue(x_step as u32)
                 }
             }
-            Some((y, x)) => GPUHasherResult::Found(y, x),
+            Some(x) => GPUHasherResult::Found(x),
         })
     }
 }
