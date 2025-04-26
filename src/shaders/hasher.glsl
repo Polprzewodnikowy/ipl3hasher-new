@@ -7,7 +7,7 @@
 
 layout(local_size_x = LOCAL_WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
-layout(std430, binding = 0) readonly buffer input_data {
+layout(push_constant) uniform input_data {
     uint target_hi;
     uint target_lo;
     uint y_offset;
@@ -15,7 +15,7 @@ layout(std430, binding = 0) readonly buffer input_data {
     uint state_in[16];
 };
 
-layout(std430, binding = 1) buffer output_data {
+layout(binding = 0) buffer output_data {
     int found;
     uint x_result;
 };

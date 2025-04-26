@@ -15,8 +15,9 @@ struct Output {
     x_result: u32,
 }
 
-@group(0) @binding(0) var<storage, read> input: Input;
-@group(0) @binding(1) var<storage, read_write> output: Output;
+var<push_constant> input: Input;
+
+@group(0) @binding(0) var<storage, read_write> output: Output;
 
 var<private> state: array<u32, 16>;
 

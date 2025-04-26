@@ -54,7 +54,6 @@ pub struct GPUHasher {
     adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    input_buffer: wgpu::Buffer,
     output_buffer: wgpu::Buffer,
     download_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
@@ -78,8 +77,11 @@ impl GPUHasher {
         let (device, queue) =
             pollster::block_on(adapter.request_device(&wgpu::wgt::DeviceDescriptor {
                 label: None,
-                required_features: wgpu::Features::SHADER_INT64,
-                required_limits: wgpu::Limits::downlevel_defaults(),
+                required_features: wgpu::Features::PUSH_CONSTANTS | wgpu::Features::SHADER_INT64,
+                required_limits: wgpu::Limits {
+                    max_push_constant_size: 128,
+                    ..wgpu::Limits::downlevel_defaults()
+                },
                 memory_hints: wgpu::MemoryHints::Performance,
                 trace: wgpu::Trace::Off,
             }))?;
@@ -108,13 +110,6 @@ impl GPUHasher {
             )
         };
 
-        let input_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: std::mem::size_of::<GPUHasherInput>() as wgpu::BufferAddress,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
         let output_buffer = device.create_buffer(&wgpu::wgt::BufferDescriptor {
             label: None,
             size: std::mem::size_of::<GPUHasherOutput>() as wgpu::BufferAddress,
@@ -131,49 +126,34 @@ impl GPUHasher {
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
                 },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
+                count: None,
+            }],
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: input_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: output_buffer.as_entire_binding(),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: output_buffer.as_entire_binding(),
+            }],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
+            push_constant_ranges: &[wgpu::PushConstantRange {
+                range: (0..std::mem::size_of::<GPUHasherInput>() as u32),
+                stages: wgpu::ShaderStages::COMPUTE,
+            }],
         });
 
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
@@ -189,7 +169,6 @@ impl GPUHasher {
             adapter,
             device,
             queue,
-            input_buffer,
             output_buffer,
             download_buffer,
             bind_group,
@@ -217,6 +196,15 @@ impl GPUHasher {
                 });
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &self.bind_group, &[]);
+            compute_pass.set_push_constants(
+                0,
+                bytemuck::bytes_of(&GPUHasherInput::new(
+                    target_checksum,
+                    y_offset,
+                    x_offset,
+                    initial_state,
+                )),
+            );
             compute_pass.dispatch_workgroups(wx, wy, wz);
         }
 
@@ -229,17 +217,6 @@ impl GPUHasher {
         );
 
         let command_buffer = command_encoder.finish();
-
-        self.queue.write_buffer(
-            &self.input_buffer,
-            0,
-            bytemuck::bytes_of(&GPUHasherInput::new(
-                target_checksum,
-                y_offset,
-                x_offset,
-                initial_state,
-            )),
-        );
 
         self.queue.submit([command_buffer]);
 
