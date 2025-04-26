@@ -72,7 +72,7 @@ fn y_bits_parser(str: &str) -> Result<Vec<u32>, String> {
     };
 
     for slice in slices.iter() {
-        let parts: Vec<&str> = slice.split(&['[', ']']).filter(|p| !p.is_empty()).collect();
+        let parts: Vec<&str> = slice.split('[').collect();
 
         if parts.len() == 0 {
             return Err(format!("empty Y bits index"));
@@ -96,7 +96,11 @@ fn y_bits_parser(str: &str) -> Result<Vec<u32>, String> {
                 }
 
                 let start = u32_from_str(range_parts[0])?;
-                let end = u32_from_str(range_parts[1])?;
+                let end = u32_from_str(
+                    range_parts[1]
+                        .strip_suffix(']')
+                        .ok_or(format!("invalid Y bits format for index {index}"))?,
+                )?;
 
                 if (start > end) || (end >= 32) {
                     return Err(format!(
