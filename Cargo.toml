@@ -7,7 +7,8 @@ edition = "2024"
 bytemuck = "1.22.0"
 clap = { version = "4.5.37", features = ["derive"] }
 pollster = "0.4.0"
-wgpu = "25.0.0"
+shaderc = { version = "0.9.1", features = ["build-from-source"] }
+wgpu = { version = "25.0.0", features = ["spirv"] }
 
 [profile.release]
 lto = true

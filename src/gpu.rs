@@ -1,21 +1,28 @@
+use crate::{compiler, error::HasherError};
+
+pub enum GPUHasherShader {
+    Wgsl,
+    Glsl,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct GPUHasherInput {
     target_hi: u32,
     target_lo: u32,
-    state: [u32; 16],
     y_offset: u32,
     x_offset: u32,
+    state: [u32; 16],
 }
 
 impl GPUHasherInput {
-    fn new(target_checksum: u64, state: [u32; 16], y_offset: u32, x_offset: u32) -> Self {
+    fn new(target_checksum: u64, y_offset: u32, x_offset: u32, state: [u32; 16]) -> Self {
         Self {
             target_hi: ((target_checksum >> 32) & 0xFFFF) as u32,
             target_lo: (target_checksum & 0xFFFFFFFF) as u32,
-            state,
             y_offset,
             x_offset,
+            state,
         }
     }
 }
@@ -24,14 +31,13 @@ impl GPUHasherInput {
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct GPUHasherOutput {
     found: i32,
-    y_result: u32,
     x_result: u32,
 }
 
 impl GPUHasherOutput {
-    fn get_result(&self) -> Option<(u32, u32)> {
+    fn get_result(&self) -> Option<u32> {
         if self.found != 0 {
-            Some((self.y_result, self.x_result))
+            Some(self.x_result)
         } else {
             None
         }
@@ -39,36 +45,9 @@ impl GPUHasherOutput {
 }
 
 pub enum GPUHasherResult {
-    Found(u32, u32),
+    Found(u32),
     Continue(u32),
     End,
-}
-
-#[derive(Debug)]
-pub enum GPUHasherError {
-    RequestDeviceError(wgpu::RequestDeviceError),
-    PollError(wgpu::PollError),
-}
-
-impl From<wgpu::RequestDeviceError> for GPUHasherError {
-    fn from(value: wgpu::RequestDeviceError) -> Self {
-        Self::RequestDeviceError(value)
-    }
-}
-
-impl From<wgpu::PollError> for GPUHasherError {
-    fn from(value: wgpu::PollError) -> Self {
-        Self::PollError(value)
-    }
-}
-
-impl std::fmt::Display for GPUHasherError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::PollError(error) => f.write_str(error.to_string().as_str()),
-            Self::RequestDeviceError(error) => f.write_str(error.to_string().as_str()),
-        }
-    }
 }
 
 pub struct GPUHasher {
@@ -84,13 +63,18 @@ pub struct GPUHasher {
 
 impl GPUHasher {
     const LOCAL_WORKGROUP_SIZE: u32 = 256;
+    const ENTRY_POINT: &str = "main";
 
     pub fn list_gpu_adapters() -> Vec<wgpu::Adapter> {
         wgpu::Instance::new(&wgpu::InstanceDescriptor::default())
             .enumerate_adapters(wgpu::Backends::all())
     }
 
-    pub fn new(adapter: wgpu::Adapter) -> Result<Self, GPUHasherError> {
+    pub fn get_gpu_info(&self) -> wgpu::AdapterInfo {
+        self.adapter.get_info()
+    }
+
+    pub fn new(adapter: wgpu::Adapter, shader: GPUHasherShader) -> Result<Self, HasherError> {
         let (device, queue) =
             pollster::block_on(adapter.request_device(&wgpu::wgt::DeviceDescriptor {
                 label: None,
@@ -100,7 +84,29 @@ impl GPUHasher {
                 trace: wgpu::Trace::Off,
             }))?;
 
-        let shader_module = device.create_shader_module(wgpu::include_wgsl!("hasher.wgsl"));
+        let shader_module_descriptor = match shader {
+            GPUHasherShader::Wgsl => wgpu::include_wgsl!("shaders/hasher.wgsl"),
+            GPUHasherShader::Glsl => wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::SpirV(
+                    compiler::compile_glsl_to_spirv(
+                        "hasher.glsl",
+                        include_str!("shaders/hasher.glsl"),
+                        Self::ENTRY_POINT,
+                        // TODO: Figure out why wgpu can't validate the shader with an unpack instruction
+                        None, // Some(vec![("USE_UNPACK_UINT_2X32", None)]),
+                    )?
+                    .into(),
+                ),
+            },
+        };
+
+        let shader_module = unsafe {
+            device.create_shader_module_trusted(
+                shader_module_descriptor,
+                wgpu::ShaderRuntimeChecks::unchecked(),
+            )
+        };
 
         let input_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
@@ -174,7 +180,7 @@ impl GPUHasher {
             label: None,
             layout: Some(&pipeline_layout),
             module: &shader_module,
-            entry_point: Some("main"),
+            entry_point: Some(Self::ENTRY_POINT),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             cache: None,
         });
@@ -192,27 +198,16 @@ impl GPUHasher {
     }
 
     pub fn x_round(
-        &self,
+        &mut self,
         target_checksum: u64,
-        initial_state: [u32; 16],
         y_offset: u32,
         x_offset: u32,
+        initial_state: [u32; 16],
         (wx, wy, wz): (u32, u32, u32),
-    ) -> Result<GPUHasherResult, GPUHasherError> {
+    ) -> Result<GPUHasherResult, HasherError> {
         let mut command_encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-        self.queue.write_buffer(
-            &self.input_buffer,
-            0,
-            bytemuck::bytes_of(&GPUHasherInput::new(
-                target_checksum,
-                initial_state,
-                y_offset,
-                x_offset,
-            )),
-        );
 
         {
             let mut compute_pass =
@@ -235,6 +230,17 @@ impl GPUHasher {
 
         let command_buffer = command_encoder.finish();
 
+        self.queue.write_buffer(
+            &self.input_buffer,
+            0,
+            bytemuck::bytes_of(&GPUHasherInput::new(
+                target_checksum,
+                y_offset,
+                x_offset,
+                initial_state,
+            )),
+        );
+
         self.queue.submit([command_buffer]);
 
         let buffer_slice = self.download_buffer.slice(..);
@@ -256,11 +262,7 @@ impl GPUHasher {
                     GPUHasherResult::Continue(x_step as u32)
                 }
             }
-            Some((y, x)) => GPUHasherResult::Found(y, x),
+            Some(x) => GPUHasherResult::Found(x),
         })
-    }
-
-    pub fn get_gpu_info(&self) -> wgpu::AdapterInfo {
-        self.adapter.get_info()
     }
 }

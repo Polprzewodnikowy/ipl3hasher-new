@@ -5,14 +5,13 @@ const MAGIC: u32 = 0x6C078965;
 struct Input {
     target_hi: u32,
     target_lo: u32,
-    state: array<u32, 16>,
     y_offset: u32,
     x_offset: u32,
+    state: array<u32, 16>,
 }
 
 struct Output {
     found: atomic<i32>,
-    y_result: u32,
     x_result: u32,
 }
 
@@ -77,26 +76,26 @@ fn finalize_checksum(y: u32, x: u32) {
 }
 
 fn finalize_hi() -> u32 {
-    var buffer: array<u32, 2> = array(state[0], state[0]);
+    var buf: array<u32, 2> = array(state[0], state[0]);
 
     for (var i: u32 = 0; i < 16; i++) {
         let data: u32 = state[i];
         let shift: u32 = data & 0x1F;
 
-        buffer[0] += (data >> shift) | (data << (32 - shift));
+        buf[0] += (data >> shift) | (data << (32 - shift));
 
-        if data < buffer[0] {
-            buffer[1] += data;
+        if data < buf[0] {
+            buf[1] += data;
         } else {
-            buffer[1] = sum(buffer[1], data, i);
+            buf[1] = sum(buf[1], data, i);
         }
     }
 
-    return sum(buffer[0], buffer[1], 16) & 0xFFFF;
+    return sum(buf[0], buf[1], 16) & 0xFFFF;
 }
 
 fn finalize_lo() -> u32 {
-    var buffer: array<u32, 2> = array(state[0], state[0]);
+    var buf: array<u32, 2> = array(state[0], state[0]);
 
     for (var i: u32 = 0; i < 16; i++) {
         let data: u32 = state[i];
@@ -104,19 +103,19 @@ fn finalize_lo() -> u32 {
         let tmp2: u32 = data & (1 << 0);
 
         if tmp == tmp2 {
-            buffer[0] += data;
+            buf[0] += data;
         } else {
-            buffer[0] = sum(buffer[0], data, i);
+            buf[0] = sum(buf[0], data, i);
         }
 
         if tmp2 == 1 {
-            buffer[1] ^= data;
+            buf[1] ^= data;
         } else {
-            buffer[1] = sum(buffer[1], data, i);
+            buf[1] = sum(buf[1], data, i);
         }
     }
 
-    return buffer[0] ^ buffer[1];
+    return buf[0] ^ buf[1];
 }
 
 @compute @workgroup_size(LOCAL_WORKGROUP_SIZE)
@@ -136,7 +135,6 @@ fn main(
     if finalize_hi() == input.target_hi {
         if finalize_lo() == input.target_lo {
             if atomicOr(&output.found, 1) == 0 {
-                output.y_result = y;
                 output.x_result = x;
             }
         }
