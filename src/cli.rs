@@ -13,13 +13,13 @@ pub struct Cli {
     #[arg(short = 'c', long, default_value("6102"), value_parser = cic_parser)]
     pub cic: (u8, u64),
 
-    /// The Y coordinate to start with
-    #[arg(short = 'y', long)]
-    pub y_init: Option<u32>,
-
     /// Y bits to use: 32-bit word indices and bit ranges (eg: 40[8..16],56[12..24]).
-    #[arg(short = 'b', long, default_value("1022[0..31]"), value_parser = ybits_parser)]
+    #[arg(short = 'b', long, default_value("1022[0..31]"), value_parser = y_bits_parser)]
     pub y_bits: std::vec::Vec<u32>,
+
+    /// The Y coordinate to start with
+    #[arg(short = 'y', long, default_value("0"))]
+    pub y_init: u32,
 
     /// The GPU to use (0 for first, 1 for second, etc.)
     #[arg(short = 'd', long, default_value("0"))]
@@ -28,9 +28,35 @@ pub struct Cli {
     /// The number of workgroups to use (x,y,z format, total threads = x*y*z*256)
     #[arg(short = 'w', long, default_value("256,256,256"), value_parser = workgroups_parser)]
     pub workgroups: (u32, u32, u32),
+
+    /// The shader module to use
+    #[arg(short = 'z', long, default_value("glsl"))]
+    pub shader: ShaderType,
 }
 
-fn ybits_parser(str: &str) -> Result<Vec<u32>, String> {
+#[derive(Clone, clap::ValueEnum)]
+pub enum ShaderType {
+    Glsl,
+    Wgsl,
+}
+
+fn cic_parser(str: &str) -> Result<(u8, u64), String> {
+    let (seed, target_checksum) = match str {
+        "6101" => (0x3F, 0x45CC73EE317A),
+        "6102" | "7101" => (0x3F, 0xA536C0F1D859),
+        "6103" | "7103" => (0x78, 0x586FD4709867),
+        "6105" | "7105" => (0x91, 0x8618A45BC2D3),
+        "6106" | "7106" => (0x85, 0x2BBAD4E6EB74),
+        "8303" => (0xDD, 0x32B294E2AB90),
+        "8401" => (0xDD, 0x6EE8D9E84970),
+        "5167" => (0xDD, 0x083C6C77E0B1),
+        "DDUS" => (0xDE, 0x05BA2EF0A5F1),
+        _ => return Err("Unknown CIC".to_string()),
+    };
+    Ok((seed, target_checksum))
+}
+
+fn y_bits_parser(str: &str) -> Result<Vec<u32>, String> {
     let slices: Vec<&str> = str.split(',').collect();
 
     if slices.len() == 0 {
@@ -66,7 +92,7 @@ fn ybits_parser(str: &str) -> Result<Vec<u32>, String> {
             }
 
             for i in start..=end {
-                values.push((index - 16)*32 + i);
+                values.push((index - 16) * 32 + i);
             }
         } else {
             let index = u32::from_str_radix(slice, 10).map_err(|e| e.to_string())?;
@@ -75,7 +101,7 @@ fn ybits_parser(str: &str) -> Result<Vec<u32>, String> {
             }
 
             for i in 0..=31 {
-                values.push((index - 16)*32 + i);
+                values.push((index - 16) * 32 + i);
             }
         }
     }
@@ -87,22 +113,6 @@ fn ybits_parser(str: &str) -> Result<Vec<u32>, String> {
     values.sort();
 
     Ok(values)
-}
-
-fn cic_parser(str: &str) -> Result<(u8, u64), String> {
-    let (seed, target_checksum) = match str {
-        "6101" => (0x3F, 0x45CC73EE317A),
-        "6102" | "7101" => (0x3F, 0xA536C0F1D859),
-        "6103" | "7103" => (0x78, 0x586FD4709867),
-        "6105" | "7105" => (0x91, 0x8618A45BC2D3),
-        "6106" | "7106" => (0x85, 0x2BBAD4E6EB74),
-        "8303" => (0xDD, 0x32B294E2AB90),
-        "8401" => (0xDD, 0x6EE8D9E84970),
-        "5167" => (0xDD, 0x083C6C77E0B1),
-        "DDUS" => (0xDE, 0x05BA2EF0A5F1),
-        _ => return Err("Unknown CIC".to_string()),
-    };
-    Ok((seed, target_checksum))
 }
 
 fn workgroups_parser(str: &str) -> Result<(u32, u32, u32), String> {

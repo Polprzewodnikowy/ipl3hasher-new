@@ -1,47 +1,52 @@
 mod cli;
+mod compiler;
 mod cpu;
+mod error;
 mod gpu;
 mod hasher;
 
-use hasher::*;
-
 fn print_execution_time(y: u32, time: std::time::Instant) {
-    println!("Y == {} took {:?}", y, time.elapsed());
+    println!("Y={} took {:?}", y, time.elapsed());
 }
 
-fn run_hasher() -> Result<(), HasherError> {
+fn run_hasher() -> Result<(), error::HasherError> {
     let cli::Cli {
         rom,
         sign,
         cic,
+        y_bits,
         y_init,
         gpu_adapter,
         workgroups,
-        y_bits
+        shader,
     } = cli::parse();
     let (seed, target_checksum) = cic;
 
-    let mut hasher = Hasher::new(
+    let shader = match shader {
+        cli::ShaderType::Glsl => gpu::GPUHasherShader::Glsl,
+        cli::ShaderType::Wgsl => gpu::GPUHasherShader::Wgsl,
+    };
+
+    let mut hasher = hasher::Hasher::new(
         rom.clone().into(),
         gpu_adapter,
         workgroups,
+        shader,
         seed,
         target_checksum,
         y_bits.clone(),
     )?;
 
-    let adapter_info = hasher.get_gpu_info();
+    let gpu_info = hasher.get_gpu_info();
 
     println!(
         "GPU: \"{}\", backend: \"{}\"",
-        adapter_info.name, adapter_info.backend
+        gpu_info.name, gpu_info.backend
     );
 
     println!("Target seed and checksum: 0x{seed:02X} 0x{target_checksum:012X}");
 
-    if let Some(y_init) = y_init {
-        hasher.set_y(y_init);
-    }
+    hasher.set_y(y_init);
 
     loop {
         let time = std::time::Instant::now();
@@ -49,19 +54,19 @@ fn run_hasher() -> Result<(), HasherError> {
         let y_current = hasher.get_y();
 
         match hasher.compute_round()? {
-            HasherResult::Found(y, x) => {
+            hasher::HasherResult::Found(y, x) => {
                 print_execution_time(y_current, time);
                 println!("Found collision: Y={y:08X} X={x:08X}");
                 if sign {
-                    Hasher::sign_rom(rom.into(), y_bits, y, x)?;
+                    hasher::Hasher::sign_rom(rom.into(), y_bits, y, x)?;
                     println!("ROM has been successfully signed");
                 }
                 return Ok(());
             }
-            HasherResult::Continue => {
+            hasher::HasherResult::Continue => {
                 print_execution_time(y_current, time);
             }
-            HasherResult::End => {
+            hasher::HasherResult::End => {
                 break;
             }
         }
