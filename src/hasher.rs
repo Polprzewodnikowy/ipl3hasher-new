@@ -25,6 +25,7 @@ impl Hasher {
         seed: u8,
         target_checksum: u64,
         y_bits: Vec<u32>,
+        y_init: u32,
     ) -> Result<Self, HasherError> {
         let ipl3 = Self::load_ipl3(path)?;
 
@@ -42,7 +43,7 @@ impl Hasher {
             workgroups,
             target_checksum,
             y_bits,
-            y: 0,
+            y: y_init,
         })
     }
 
@@ -87,10 +88,6 @@ impl Hasher {
         f.write_all(&data)?;
         f.flush()?;
         Ok(())
-    }
-
-    pub fn set_y(&mut self, y: u32) {
-        self.y = y;
     }
 
     pub fn get_y(&self) -> u32 {

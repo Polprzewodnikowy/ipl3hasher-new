@@ -35,6 +35,7 @@ fn run_hasher() -> Result<(), error::HasherError> {
         seed,
         target_checksum,
         y_bits.clone(),
+        y_init,
     )?;
 
     let gpu_info = hasher.get_gpu_info();
@@ -45,8 +46,6 @@ fn run_hasher() -> Result<(), error::HasherError> {
     );
 
     println!("Target seed and checksum: 0x{seed:02X} 0x{target_checksum:012X}");
-
-    hasher.set_y(y_init);
 
     loop {
         let time = std::time::Instant::now();
