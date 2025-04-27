@@ -10,7 +10,6 @@ pub enum HasherResult {
 pub struct Hasher {
     cpu: cpu::CPUHasher,
     gpu: gpu::GPUHasher,
-    workgroups: (u32, u32, u32),
     target_checksum: u64,
     y_bits: Vec<u32>,
     y: u32,
@@ -35,12 +34,11 @@ impl Hasher {
         let adapter = adapters
             .get(gpu_adapter_id)
             .ok_or(HasherError::GPUAdapterOutOfBounds)?;
-        let gpu = gpu::GPUHasher::new(adapter.clone(), shader)?;
+        let gpu = gpu::GPUHasher::new(adapter.clone(), shader, workgroups)?;
 
         Ok(Self {
             cpu,
             gpu,
-            workgroups,
             target_checksum,
             y_bits,
             y: y_init,
@@ -117,13 +115,9 @@ impl Hasher {
         let mut x_offset = 0;
 
         loop {
-            let result = self.gpu.x_round(
-                self.target_checksum,
-                y_offset,
-                x_offset,
-                state,
-                self.workgroups,
-            )?;
+            let result = self
+                .gpu
+                .x_round(self.target_checksum, y_offset, x_offset, state)?;
 
             match result {
                 gpu::GPUHasherResult::Found(x) => {

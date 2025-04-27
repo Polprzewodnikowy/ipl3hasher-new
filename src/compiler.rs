@@ -12,7 +12,7 @@ pub fn compile_glsl_to_spirv(
 
     compile_options.set_target_env(
         shaderc::TargetEnv::Vulkan,
-        shaderc::EnvVersion::Vulkan1_0 as u32,
+        shaderc::EnvVersion::Vulkan1_1 as u32,
     );
 
     compile_options.set_optimization_level(shaderc::OptimizationLevel::Performance);

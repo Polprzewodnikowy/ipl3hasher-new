@@ -58,6 +58,7 @@ pub struct GPUHasher {
     download_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     compute_pipeline: wgpu::ComputePipeline,
+    workgroups: (u32, u32, u32),
 }
 
 impl GPUHasher {
@@ -73,7 +74,11 @@ impl GPUHasher {
         self.adapter.get_info()
     }
 
-    pub fn new(adapter: wgpu::Adapter, shader: GPUHasherShader) -> Result<Self, HasherError> {
+    pub fn new(
+        adapter: wgpu::Adapter,
+        shader: GPUHasherShader,
+        workgroups: (u32, u32, u32),
+    ) -> Result<Self, HasherError> {
         let (device, queue) =
             pollster::block_on(adapter.request_device(&wgpu::wgt::DeviceDescriptor {
                 label: None,
@@ -173,6 +178,7 @@ impl GPUHasher {
             download_buffer,
             bind_group,
             compute_pipeline,
+            workgroups,
         })
     }
 
@@ -182,8 +188,9 @@ impl GPUHasher {
         y_offset: u32,
         x_offset: u32,
         initial_state: [u32; 16],
-        (wx, wy, wz): (u32, u32, u32),
     ) -> Result<GPUHasherResult, HasherError> {
+        let (wx, wy, wz) = self.workgroups;
+
         let mut command_encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
