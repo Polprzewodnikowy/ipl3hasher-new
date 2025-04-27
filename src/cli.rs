@@ -67,7 +67,7 @@ fn y_bits_parser(str: &str) -> Result<Vec<u32>, String> {
 
     let mut push_y_bits = |index: u32, start: u32, end: u32| {
         for i in start..=end {
-            values.push((index - 16) * 32 + i);
+            values.push(((index - 16) * 32) + (31 - i));
         }
     };
 
@@ -95,8 +95,8 @@ fn y_bits_parser(str: &str) -> Result<Vec<u32>, String> {
                     return Err(format!("invalid Y bits range format for index {index}"));
                 }
 
-                let start = u32_from_str(range_parts[0])?;
-                let end = u32_from_str(
+                let end = u32_from_str(range_parts[0])?;
+                let start = u32_from_str(
                     range_parts[1]
                         .strip_suffix(']')
                         .ok_or(format!("invalid Y bits format for index {index}"))?,
