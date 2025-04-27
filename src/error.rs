@@ -4,7 +4,6 @@ pub enum HasherError {
     GPUAdapterOutOfBounds,
     WgpuRequestDeviceError(wgpu::RequestDeviceError),
     WgpuPollError(wgpu::PollError),
-    ShadercError(shaderc::Error),
     IoError(std::io::Error),
 }
 
@@ -17,7 +16,6 @@ impl std::fmt::Display for HasherError {
             Self::GPUAdapterOutOfBounds => f.write_str("Selected GPU adapter doesn't exist"),
             Self::WgpuRequestDeviceError(error) => f.write_str(error.to_string().as_str()),
             Self::WgpuPollError(error) => f.write_str(error.to_string().as_str()),
-            Self::ShadercError(error) => f.write_str(error.to_string().as_str()),
             Self::IoError(error) => f.write_str(error.to_string().as_str()),
         }
     }
@@ -32,12 +30,6 @@ impl From<wgpu::RequestDeviceError> for HasherError {
 impl From<wgpu::PollError> for HasherError {
     fn from(value: wgpu::PollError) -> Self {
         Self::WgpuPollError(value)
-    }
-}
-
-impl From<shaderc::Error> for HasherError {
-    fn from(value: shaderc::Error) -> Self {
-        Self::ShadercError(value)
     }
 }
 

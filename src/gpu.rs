@@ -1,4 +1,4 @@
-use crate::{compiler, error::HasherError};
+use crate::error::HasherError;
 
 pub enum GPUHasherShader {
     Wgsl,
@@ -93,19 +93,7 @@ impl GPUHasher {
 
         let shader_module_descriptor = match shader {
             GPUHasherShader::Wgsl => wgpu::include_wgsl!("shaders/hasher.wgsl"),
-            GPUHasherShader::Glsl => wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::SpirV(
-                    compiler::compile_glsl_to_spirv(
-                        "hasher.glsl",
-                        include_str!("shaders/hasher.glsl"),
-                        Self::ENTRY_POINT,
-                        // TODO: Figure out why wgpu can't validate the shader with an unpack instruction
-                        None, // Some(vec![("USE_UNPACK_UINT_2X32", None)]),
-                    )?
-                    .into(),
-                ),
-            },
+            GPUHasherShader::Glsl => wgpu::include_spirv!("shaders/hasher.spv"),
         };
 
         let shader_module = unsafe {

@@ -1,5 +1,4 @@
 mod cli;
-mod compiler;
 mod cpu;
 mod error;
 mod gpu;
