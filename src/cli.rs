@@ -13,8 +13,8 @@ pub struct Cli {
     #[arg(short = 'c', long, default_value("6102"), value_parser = cic_parser)]
     pub cic: (u8, u64),
 
-    /// Y bits to use: 32-bit word indices and bit ranges (eg: 40[8..16],56[12..24]).
-    #[arg(short = 'b', long, default_value("1022[0..31]"), value_parser = y_bits_parser)]
+    /// Y bits to use: 32-bit word indices and bit ranges (eg: 40[16..8],56[24..12]).
+    #[arg(short = 'b', long, default_value("1022[31..0]"), value_parser = y_bits_parser)]
     pub y_bits: std::vec::Vec<u32>,
 
     /// The Y coordinate to start with
