@@ -21,20 +21,14 @@ var<push_constant> input: Input;
 
 var<private> state: array<u32, 16>;
 
-fn sum(
-    v0: u32,
-    v1: u32,
-    v2: u32
-) -> u32 {
-    let a0: u32 = v0;
-    var a1: u32 = v1;
-    let a2: u32 = v2;
+fn sum(a0: u32, a1: u32, a2: u32) -> u32 {
+    var v1: u32 = a1;
 
     if a1 == 0 {
-        a1 = a2;
+        v1 = a2;
     }
 
-    let prod: u64 = u64(a0) * u64(a1);
+    let prod: u64 = u64(a0) * u64(v1);
     let hi: u32 = u32(prod >> 32);
     let lo: u32 = u32(prod);
     let diff: u32 = hi - lo;
@@ -47,37 +41,46 @@ fn sum(
 }
 
 fn finalize_checksum(y: u32, x: u32) {
-    let y_top5bits: u32 = y >> 27;
-    let y_bottom5bits: u32 = y & 0x1F;
+    let yts: u32 = y >> 27;
+    let ytc: u32 = 32 - yts;
 
-    state[10] = sum(state[10], x, 1007);
-    state[11] = sum(state[11], x, 1007);
-    state[13] += (x >> (x & 0x1F)) | (x << (32 - (x & 0x1F)));
-    state[14] = sum(state[14], (x >> y_bottom5bits) | (x << (32 - y_bottom5bits)), 1007);
-    state[15] = sum(state[15], (x << y_top5bits) | (x >> (32 - y_top5bits)), 1007);
+    let ybs: u32 = y & 0x1F;
+    let ybc: u32 = 32 - ybs;
+
+    let xbs: u32 = x & 0x1F;
+    let xbc: u32 = 32 - xbs;
 
     state[0] += sum(0xFFFFFFFF, x, 1008);
     state[1] = sum(state[1], x, 1008);
     state[2] ^= x;
     state[3] += sum(x + 5, MAGIC, 1008);
-    state[4] += (x << (32 - y_bottom5bits)) | (x >> y_bottom5bits);
-    state[5] += (x >> (32 - y_top5bits)) | (x << y_top5bits);
-    if x < state[6] {
+    state[4] += (x >> ybs) | (x << ybc);
+    state[5] += (x << yts) | (x >> ytc);
+    if (x < state[6]) {
         state[6] = (x + 1008) ^ (state[3] + state[6]);
     } else {
-        state[6] = (state[4] + x) ^ state[6];
+        state[6] ^= (state[4] + x);
     }
-    state[7] = sum(state[7], (x >> (32 - y_bottom5bits) | (x << y_bottom5bits)), 1008);
-    state[8] = sum(state[8], (x << (32 - y_top5bits)) | (x >> y_top5bits), 1008);
-    if y < x {
+    state[7] = sum(state[7], (x << ybs) | (x >> ybc), 1008);
+    state[8] = sum(state[8], (x >> yts) | (x << ytc), 1008);
+    if (y < x) {
         state[9] = sum(state[9], x, 1008);
     } else {
         state[9] += x;
     }
+    state[10] = sum(state[10], x, 1007);
+    state[11] = sum(state[11], x, 1007);
+    state[13] += (x >> xbs) | (x << xbc);
+    state[14] = sum(state[14], (x >> ybs) | (x << ybc), 1007);
+    state[15] = sum(state[15], (x << yts) | (x >> ytc), 1007);
 }
 
 fn finalize_hi() -> u32 {
-    var buf: array<u32, 2> = array(state[0], state[0]);
+    var buf: array<u32, 2>;
+
+    for (var i: u32 = 0; i < 2; i++) {
+        buf[i] = state[0];
+    }
 
     for (var i: u32 = 0; i < 16; i++) {
         let data: u32 = state[i];

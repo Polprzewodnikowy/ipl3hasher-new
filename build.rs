@@ -19,9 +19,6 @@ fn main() {
 
     compile_options.set_optimization_level(shaderc::OptimizationLevel::Performance);
 
-    // TODO: Figure out why wgpu can't validate the shader with an unpack instruction
-    // compile_options.add_macro_definition("USE_UNPACK_UINT_2X32", None);
-
     let compilation_artifact = compiler
         .compile_into_spirv(
             source,
