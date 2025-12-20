@@ -15,7 +15,7 @@ fn run_hasher() -> Result<(), error::HasherError> {
         cic,
         y_bits,
         y_init,
-        gpu_adapter,
+        gpu_adapters,
         workgroups,
         shader,
     } = cli::parse();
@@ -28,7 +28,7 @@ fn run_hasher() -> Result<(), error::HasherError> {
 
     let mut hasher = hasher::Hasher::new(
         rom.clone().into(),
-        gpu_adapter,
+        gpu_adapters,
         workgroups,
         shader,
         seed,
@@ -37,12 +37,12 @@ fn run_hasher() -> Result<(), error::HasherError> {
         y_init,
     )?;
 
-    let gpu_info = hasher.get_gpu_info();
+    let gpu_infos = hasher.get_gpu_infos();
 
-    println!(
-        "GPU: \"{}\", backend: \"{}\"",
-        gpu_info.name, gpu_info.backend
-    );
+    println!("GPUs in use:");
+    for gpu_info in gpu_infos {
+        println!("  \"{}\", backend: \"{}\"", gpu_info.name, gpu_info.backend);
+    }
 
     println!("Target seed and checksum: 0x{seed:02X} 0x{target_checksum:012X}");
 

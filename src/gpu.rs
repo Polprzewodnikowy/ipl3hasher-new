@@ -1,5 +1,6 @@
 use crate::error::HasherError;
 
+#[derive(Clone, Copy)]
 pub enum GPUHasherShader {
     Wgsl,
     Glsl,

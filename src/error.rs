@@ -2,6 +2,7 @@
 pub enum HasherError {
     ChecksumVerifyError(u32, u32, u64),
     GPUAdapterOutOfBounds,
+    NoCompatibleGpu,
     WgpuRequestDeviceError(wgpu::RequestDeviceError),
     WgpuPollError(wgpu::PollError),
     IoError(std::io::Error),
@@ -14,6 +15,9 @@ impl std::fmt::Display for HasherError {
                 "GPU Hasher result is wrong: Y={y:08X} X={x:08X} | 0x{verify_checksum:012X}"
             )),
             Self::GPUAdapterOutOfBounds => f.write_str("Selected GPU adapter doesn't exist"),
+            Self::NoCompatibleGpu => f.write_str(
+                "No GPU adapters support required features (need SHADER_INT64 and PUSH_CONSTANTS)",
+            ),
             Self::WgpuRequestDeviceError(error) => f.write_str(error.to_string().as_str()),
             Self::WgpuPollError(error) => f.write_str(error.to_string().as_str()),
             Self::IoError(error) => f.write_str(error.to_string().as_str()),
