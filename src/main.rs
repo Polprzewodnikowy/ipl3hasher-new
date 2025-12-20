@@ -4,8 +4,13 @@ mod error;
 mod gpu;
 mod hasher;
 
-fn print_round_execution_time(y: u32, time: std::time::Instant) {
-    println!("Y={} took {:?}", y, time.elapsed());
+fn format_duration(d: std::time::Duration) -> String {
+    let secs = d.as_secs();
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    let seconds = secs % 60;
+    let millis = d.subsec_millis();
+    format!("{hours:02}:{minutes:02}:{seconds:02}.{millis:03}")
 }
 
 fn run_hasher() -> Result<(), error::HasherError> {
@@ -46,25 +51,24 @@ fn run_hasher() -> Result<(), error::HasherError> {
 
     println!("Target seed and checksum: 0x{seed:02X} 0x{target_checksum:012X}");
 
+    let total_start = std::time::Instant::now();
+
     loop {
-        let time = std::time::Instant::now();
-
-        let y_current = hasher.get_y();
-
         match hasher.compute_round()? {
             hasher::HasherResult::Found(y, x) => {
-                print_round_execution_time(y_current, time);
+                let total = total_start.elapsed();
                 println!("Found collision: Y={y:08X} X={x:08X}");
+                println!("Total time: {}", format_duration(total));
                 if sign {
                     hasher::Hasher::sign_rom(rom.into(), y_bits, y, x)?;
                     println!("ROM has been successfully signed");
                 }
                 return Ok(());
             }
-            hasher::HasherResult::Continue => {
-                print_round_execution_time(y_current, time);
-            }
+            hasher::HasherResult::Continue => {}
             hasher::HasherResult::End => {
+                let total = total_start.elapsed();
+                println!("Total time: {}", format_duration(total));
                 break;
             }
         }

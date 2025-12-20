@@ -157,10 +157,6 @@ impl Hasher {
         Ok(())
     }
 
-    pub fn get_y(&self) -> u32 {
-        self.y_base
-    }
-
     fn max_y(&self) -> u32 {
         ((1u64 << self.y_bits.len()) - 1) as u32
     }
