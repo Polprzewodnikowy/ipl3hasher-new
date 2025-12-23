@@ -21,9 +21,9 @@ pub struct Cli {
     #[arg(short = 'y', long, default_value("0"))]
     pub y_init: u32,
 
-    /// The GPU to use (0 for first, 1 for second, etc.)
-    #[arg(short = 'd', long, default_value("0"))]
-    pub gpu_adapter: usize,
+    /// GPU adapters to use (comma-separated indices). Uses all when omitted.
+    #[arg(short = 'd', long, value_delimiter = ',')]
+    pub gpu_adapters: Option<Vec<usize>>,
 
     /// The number of workgroups to use (x,y,z format, total threads = x*y*z*256)
     #[arg(short = 'w', long, default_value("256,256,256"), value_parser = workgroups_parser)]
